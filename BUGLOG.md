@@ -18,3 +18,10 @@ Este registro documenta los errores críticos y su proceso técnico de debugging
 | **Fix aplicado** | Actualización de las acciones a versiones nativas de Node 24 (`v6`) y consolidación de la lógica de caché dentro de `setup-node@v6` para eliminar dependencias externas de Node 20. |
 | **Test de regresión** | Verificación en el panel de Actions de que la ejecución es limpia y carece de anotaciones de deprecación o forzado. |
 | **Tipo de error agentic** | *Falta de profundidad técnica* (El primer fix fue solo una configuración de entorno sin actualizar los componentes core). |
+| **ID del bug** | BUG-003 |
+| **Archivo afectado** | `package.json` |
+| **Síntoma** | El pipeline de CI falla en el job `lint` con el error `sh: 1: eslint: not found`. |
+| **Causa raíz** | La dependencia `eslint` no estaba declarada en `devDependencies`, por lo que `npm ci` en el entorno limpio de GitHub Actions no la instalaba, a pesar de existir un script que la invocaba. |
+| **Fix aplicado** | Instalación formal de `eslint` y plugins de React/Typescript necesarios en las `devDependencies`. |
+| **Test de regresión** | Ejecución exitosa del comando `npm run lint` en el servidor de CI. |
+| **Tipo de error agentic** | *Falta de restricciones* (Se asumió que el entorno tenía las herramientas necesarias sin verificar el manifiesto de dependencias). |
