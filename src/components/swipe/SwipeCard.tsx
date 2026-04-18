@@ -1,4 +1,5 @@
 import React, { useState, useRef, PointerEvent, KeyboardEvent } from 'react';
+import { OptimizedImage } from '../common/OptimizedImage';
 
 // ==========================================
 // TIPOS E INTERFACES EXPLICITOS
@@ -108,11 +109,11 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ movie, onSwipe }) => {
       onKeyDown={handleKeyDown}
     >
       {/* Contenido Visual: Póster */}
-      <img 
-        src={movie.posterUrl} 
-        alt={movie.title} 
+      <OptimizedImage
+        src={movie.posterUrl}
+        alt={movie.title}
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-        draggable="false"
+        priority={true}
       />
       
       {/* Indicadores visuales de Like/Dislike */}

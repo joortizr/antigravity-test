@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CineSwipe</title>
+    <!-- Preconnect para acelerar la descarga de imágenes (LCP) -->
+    <link rel="preconnect" href="https://image.tmdb.org" />
+    <link rel="dns-prefetch" href="https://image.tmdb.org" />
+    
+    <!-- Preload del request inicial a TMDB para saltar la cascada de React JS (Network Request Discovery LCP fix) -->
+    <link 
+      rel="preload" 
+      as="fetch" 
+      crossorigin="anonymous" 
+      href="https://api.themoviedb.org/3/discover/movie?page=1&sort_by=popularity.desc&language=es-ES&api_key=%VITE_TMDB_KEY%" 
+    />
   </head>
   <body>
     <div id="root"></div>

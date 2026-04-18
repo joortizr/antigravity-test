@@ -6,7 +6,7 @@ import { TMDBMovie } from '../../types/tmdb.types';
 
 export const Discovery: React.FC = () => {
   const { movies, loading, error, loadMore, hasMore } = useMovies();
-  const dispatch = useMovieActions();
+  const { swipe } = useMovieActions();
   const historyState = useMovieHistory();
   
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -15,10 +15,7 @@ export const Discovery: React.FC = () => {
 
   const handleSwipe = (direction: 'like' | 'dislike') => {
     if (currentMovie) {
-       dispatch({ 
-         type: direction === 'like' ? 'SWIPE_RIGHT' : 'SWIPE_LEFT', 
-         payload: currentMovie 
-       });
+       swipe(direction, currentMovie);
        
        if (currentIndex + 1 >= movies.length) {
           if (hasMore) {
@@ -35,9 +32,14 @@ export const Discovery: React.FC = () => {
 
   if (loading && movies.length === 0) {
     return (
-      <div className="flex flex-col items-center animate-pulse">
+      <div className="relative flex flex-col items-center animate-pulse">
+        <div className="mb-6 h-5 w-32 bg-gray-800 rounded"></div>
         <div className="w-80 h-[28rem] bg-gray-800 rounded-2xl shadow-xl flex items-center justify-center border border-gray-700">
           <p className="text-gray-400 font-bold text-lg">Cargando Películas...</p>
+        </div>
+        <div className="mt-10 flex justify-center space-x-8">
+          <div className="w-16 h-16 bg-gray-800 rounded-full border border-gray-700"></div>
+          <div className="w-16 h-16 bg-gray-800 rounded-full border border-gray-700"></div>
         </div>
       </div>
     );
@@ -67,14 +69,21 @@ export const Discovery: React.FC = () => {
 
   const movieWithAbsoluteUrl = {
     ...currentMovie,
+    id: currentMovie.id.toString(),
+    title: currentMovie.title,
+    year: currentMovie.release_date ? new Date(currentMovie.release_date).getFullYear() : 0,
+    rating: currentMovie.vote_average,
     posterUrl: currentMovie.poster_path 
       ? `https://image.tmdb.org/t/p/w500${currentMovie.poster_path}` 
       : 'https://via.placeholder.com/500x750/111827/ffffff?text=No+Poster'
   };
 
+  const nextMovie = currentIndex + 1 < movies.length ? (movies[currentIndex + 1] as TMDBMovie) : undefined;
+  const nextMovieUrl = nextMovie?.poster_path ? `https://image.tmdb.org/t/p/w342${nextMovie.poster_path}` : undefined;
+
   return (
     <div className="relative flex flex-col items-center">
-       <div className="mb-6 text-sm text-gray-400 font-semibold tracking-widest uppercase flex items-center gap-2">
+       <div className="mb-6 h-5 text-sm text-gray-400 font-semibold tracking-widest uppercase flex items-center justify-center gap-2">
           <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
           Recomendación
        </div>
@@ -84,6 +93,10 @@ export const Discovery: React.FC = () => {
          movie={movieWithAbsoluteUrl} 
          onSwipe={handleSwipe} 
        />
+       
+       {nextMovieUrl && (
+         <link rel="preload" as="image" href={nextMovieUrl} />
+       )}
        
        <div className="mt-10 flex justify-center space-x-8">
           <button 

@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { MovieProvider } from './context/movies/MovieContext';
-import { Discovery } from './pages/Discovery/Discovery';
+
+// Implementación de React.lazy para diferir la carga del bundle de Discovery
+const Discovery = lazy(() => 
+  import('./pages/Discovery/Discovery').then(module => ({ default: module.Discovery }))
+);
 
 const App: React.FC = () => {
   return (
@@ -12,7 +16,15 @@ const App: React.FC = () => {
           </h1>
         </header>
         <main className="flex justify-center items-center h-screen pt-20">
-          <Discovery />
+          <Suspense fallback={
+            <div className="flex flex-col items-center justify-center h-full">
+              <div className="animate-pulse w-80 h-[28rem] bg-gray-800 rounded-2xl shadow-xl border border-gray-700 flex items-center justify-center">
+                <span className="text-gray-400 font-bold text-lg">Iniciando aplicación...</span>
+              </div>
+            </div>
+          }>
+            <Discovery />
+          </Suspense>
         </main>
       </div>
     </MovieProvider>

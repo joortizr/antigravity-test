@@ -1,5 +1,6 @@
-import React, { createContext, useReducer, useEffect, useContext, ReactNode, useMemo } from 'react';
+import React, { createContext, useReducer, useEffect, useContext, ReactNode, useMemo, useCallback } from 'react';
 import type { TMDBMovie } from '../../types/tmdb.types';
+import { supabase } from '../../lib/supabase';
 
 // ==========================================
 // 1. TIPOS DE ESTADO Y ACCIONES
@@ -10,7 +11,7 @@ export type SwipeDirection = 'like' | 'dislike';
 export interface HistoryItem {
   movie: TMDBMovie;
   direction: SwipeDirection;
-  timestamp: number; // Para poder ordenar cronológicamente si hace falta
+  timestamp: number;
 }
 
 export interface MovieState {
@@ -24,6 +25,13 @@ export type MovieAction =
   | { type: 'CLEAR_HISTORY' }
   | { type: 'REHYDRATE'; payload: MovieState };
 
+// Interfaz para el Custom Dispatcher
+export interface MovieActions {
+  swipe: (direction: SwipeDirection, movie: TMDBMovie) => Promise<void>;
+  undo: () => void;
+  clear: () => void;
+}
+
 // ==========================================
 // 2. REDUCER PURO
 // ==========================================
@@ -36,34 +44,20 @@ export const movieReducer = (state: MovieState, action: MovieAction): MovieState
     case 'SWIPE_RIGHT':
     case 'SWIPE_LEFT': {
       const direction = action.type === 'SWIPE_RIGHT' ? 'like' : 'dislike';
-      
-      const newItem: HistoryItem = {
-        movie: action.payload,
-        direction,
-        timestamp: Date.now()
-      };
-
-      // Inyectamos al inicio para facilitar el UNDO_LAST (el índice 0 es el más reciente)
+      const newItem: HistoryItem = { movie: action.payload, direction, timestamp: Date.now() };
       const newHistory = [newItem, ...state.history];
-      
-      // Control FIFO (First In, First Out) - descartamos el último (el más antiguo) si nos pasamos de 50
-      if (newHistory.length > MAX_HISTORY) {
-        newHistory.pop();
-      }
-
+      if (newHistory.length > MAX_HISTORY) newHistory.pop();
       return { ...state, history: newHistory };
     }
     case 'UNDO_LAST': {
       if (state.history.length === 0) return state;
-      // Quitamos el primer elemento (el más reciente)
-      const restoredHistory = state.history.slice(1);
-      return { ...state, history: restoredHistory };
+      return { ...state, history: state.history.slice(1) };
     }
     case 'CLEAR_HISTORY': {
       return { ...state, history: [] };
     }
     case 'REHYDRATE': {
-      return action.payload; // Sobrescribimos el estado con lo que vino de LocalStorage
+      return action.payload;
     }
     default:
       return state;
@@ -74,48 +68,60 @@ export const movieReducer = (state: MovieState, action: MovieAction): MovieState
 // 3. CONTEXTOS (Separación Read/Write)
 // ==========================================
 
-/** Contexto exclusivo para lectura del historial. Evita re-renders en componentes que solo despachan acciones. */
 const MovieStateContext = createContext<MovieState | undefined>(undefined);
-
-/** Contexto exclusivo para métodos de acción. Componentes como botones pueden usar esto sin re-renderizarse cuando el estado cambie. */
-const MovieDispatchContext = createContext<React.Dispatch<MovieAction> | undefined>(undefined);
+const MovieDispatchContext = createContext<MovieActions | undefined>(undefined);
 
 // ==========================================
 // 4. PROVIDER COMPONENT
 // ==========================================
 
-const LOCAL_STORAGE_KEY = 'cineswipe_history_v1';
+const LOCAL_SESSION_KEY = 'cineswipe_session_id';
 
 export const MovieProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(movieReducer, INITIAL_STATE);
 
-  // EFECTO: Rehidratación inicial en montaje previendo re-ejecución Segura en StrictMode de React 18
+  // Inicialización de la sesión anónima
   useEffect(() => {
+    let sessionId = localStorage.getItem(LOCAL_SESSION_KEY);
+    if (!sessionId) {
+      sessionId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+      localStorage.setItem(LOCAL_SESSION_KEY, sessionId);
+    }
+
+    // Opcional: Rehidratar el historial recuperando los likes base de Supabase si quisieramos
+    // Por ahora partimos con historial limpio al inicializar si no se implementa el fetching de historial.
+  }, []);
+
+  // Custom Wrapper para desencadenar efectos secundarios (Network) sincronizados con UI
+  const swipe = useCallback(async (direction: SwipeDirection, movie: TMDBMovie) => {
+    // 1. Actualización Optimizada de la Vista (Optimistic UI) Inmediata
+    dispatch({ type: direction === 'like' ? 'SWIPE_RIGHT' : 'SWIPE_LEFT', payload: movie });
+
+    // 2. Sincronización en Background hacia Supabase Cloud
     try {
-      const storedDataStr = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (storedDataStr) {
-        const parsedState = JSON.parse(storedDataStr) as MovieState;
-        dispatch({ type: 'REHYDRATE', payload: parsedState });
+      const { error } = await supabase.from('movie_interactions').insert({
+        movie_id: movie.id,
+        movie_title: movie.title,
+        movie_year: movie.release_date ? new Date(movie.release_date).getFullYear() : null,
+        movie_rating: movie.vote_average,
+        poster_path: movie.poster_path,
+        interaction: direction
+        // Nota: Omitimos user_id porque se requiere relajar el RLS para que inserte null o un formato de UUID fantasma
+      });
+
+      if (error) {
+        console.error('CineSwipe Supabase Sync Error:', error.message);
       }
-    } catch (error) {
-      console.warn('CineSwipe: Error al decodificar el historial de localStorage', error);
-      localStorage.removeItem(LOCAL_STORAGE_KEY); // Limpia datos corruptos preventivamente
+    } catch (err) {
+      console.error('Error fatal comunicando con Supabase:', err);
     }
   }, []);
 
-  // EFECTO: Sincronización a localStorage cada vez que todo el árbol derivado cambie
-  useEffect(() => {
-    // Para simplificar la persistencia, se escribe siempre.
-    // Un debounce ayudaría en flujos rápidos.
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+  const undo = useCallback(() => dispatch({ type: 'UNDO_LAST' }), []);
+  const clear = useCallback(() => dispatch({ type: 'CLEAR_HISTORY' }), []);
 
-  // Memorización de valores exigida para escudar hijos complejos de re-renders no deseados
   const stateValue = useMemo(() => state, [state]);
-  
-  // Nota técnica: React asegura que 'dispatch' mantiene su identidad entre renders. 
-  // Sin embargo, agregamos el useMemo tal y como demanda la arquitectura pedida explícitamente.
-  const dispatchValue = useMemo(() => dispatch, [dispatch]);
+  const dispatchValue = useMemo(() => ({ swipe, undo, clear }), [swipe, undo, clear]);
 
   return (
     <MovieStateContext.Provider value={stateValue}>
