@@ -147,11 +147,12 @@ export function useMovies(options: UseMoviesOptions = {}): UseMoviesReturn {
       setMovies(prev => page === 1 ? rawData.results : [...prev, ...rawData.results]);
       setHasMore(rawData.page < rawData.total_pages);
 
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
+    } catch (err: unknown) {
+      const errorObj = err as Error;
+      if (errorObj.name === 'AbortError') {
         console.log('Petición fetch abortada (limpieza normal o request duplicada)');
       } else {
-        setError(err.message || 'Error de red desconocido');
+        setError(errorObj.message || 'Error de red desconocido');
       }
     } finally {
       // Ojo: no seteamos loading false si fue abortado para evitar flicker

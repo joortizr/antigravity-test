@@ -32,7 +32,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({ src, alt, classN
       alt={alt}
       className={`${!priority ? `transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}` : ''} ${className}`}
       loading={priority ? "eager" : "lazy"}
-      // @ts-ignore
+      // @ts-expect-error - fetchpriority is valid in modern browsers but not typed in React yet
       fetchpriority={priority ? "high" : "auto"}
       decoding={priority ? "sync" : "async"}
       onLoad={() => setLoaded(true)}

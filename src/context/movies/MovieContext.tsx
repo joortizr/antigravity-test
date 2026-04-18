@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Context files intentionally export multiple utilities */
 import React, { createContext, useReducer, useEffect, useContext, ReactNode, useMemo, useCallback } from 'react';
 import type { TMDBMovie } from '../../types/tmdb.types';
 import { supabase } from '../../lib/supabase';
