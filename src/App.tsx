@@ -1,10 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { MovieProvider } from './context/movies/MovieContext';
 
-// Implementación de React.lazy para diferir la carga del bundle de Discovery
-const Discovery = lazy(() => 
-  import('./pages/Discovery/Discovery').then(module => ({ default: module.Discovery }))
-);
+import { Discovery } from './pages/Discovery/Discovery';
 
 const App: React.FC = () => {
   return (
